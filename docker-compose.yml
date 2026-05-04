@@ -1,0 +1,58 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: seasonschedule
+      POSTGRES_PASSWORD: seasonschedule_pass
+      POSTGRES_DB: seasonschedule_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/01-init.sql
+    networks:
+      - seasonschedule
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U seasonschedule"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./back
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: seasonschedule
+      DB_PASSWORD: seasonschedule_pass
+      DB_NAME: seasonschedule_db
+    networks:
+      - seasonschedule
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./front
+      dockerfile: Dockerfile
+    ports:
+      - "4200:80"
+    depends_on:
+      - backend
+    networks:
+      - seasonschedule
+    restart: unless-stopped
+
+networks:
+  seasonschedule:
+    driver: bridge
+
+volumes:
+  db_data:
